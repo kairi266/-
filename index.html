@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>令和黎明期 ハクスラ</title>
+<style>
+  :root {
+    --bg: #16121e;
+    --panel: #241b34;
+    --panel-light: #35284d;
+    --accent: #ff3d81;
+    --accent2: #ffcb3d;
+    --text: #f3eefc;
+    --sub: #b7a8d4;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg); color: var(--text);
+    font-family: "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+    overflow: hidden;
+  }
+  #app { position: relative; width: 100%; height: 100%; max-width: 480px; margin: 0 auto; background: var(--bg); }
+  .screen {
+    position: absolute; inset: 0; display: none; flex-direction: column;
+    padding: 16px; overflow-y: auto;
+  }
+  .screen.active { display: flex; }
+
+  /* ---------- タイトル画面 ---------- */
+  #title-screen { align-items: center; justify-content: center; text-align: center;
+    background: radial-gradient(circle at 50% 30%, #3a2455 0%, #16121e 70%); }
+  .logo {
+    font-size: 42px; font-weight: 900; letter-spacing: 4px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: 0 0 30px rgba(255,61,129,0.4);
+    margin-bottom: 4px;
+  }
+  .subtitle { color: var(--sub); font-size: 13px; letter-spacing: 2px; margin-bottom: 40px; }
+  .start-btn {
+    padding: 16px 40px; font-size: 18px; font-weight: bold; border: none; border-radius: 30px;
+    background: linear-gradient(90deg, var(--accent), #ff7a3d); color: white;
+    box-shadow: 0 6px 20px rgba(255,61,129,0.5);
+    animation: pulse 1.6s infinite;
+  }
+  @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+  .flavor { margin-top: 30px; font-size: 12px; color: var(--sub); line-height: 1.8; }
+
+  /* ---------- 共通ヘッダー(ステータスバー) ---------- */
+  #status-bar {
+    display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 10px; background: var(--panel);
+    border-radius: 12px; margin-bottom: 10px; font-size: 12px;
+  }
+  .stat-chip { display: flex; align-items: center; gap: 4px; background: var(--panel-light);
+    padding: 5px 10px; border-radius: 20px; white-space: nowrap; }
+  .stat-chip b { color: var(--accent2); }
+  .stat-chip.yani b { color: #ffd23d; }
+  .stat-chip.chike b { color: #3dd8ff; }
+  .stat-chip.fan b { color: #ff6bd6; }
+
+  /* HPバー */
+  .hpbar-wrap { width: 100%; background: #2a2038; border-radius: 8px; height: 14px; overflow: hidden; margin-top: 2px; }
+  .hpbar { height: 100%; background: linear-gradient(90deg,#3dffb0,#3dd8ff); transition: width .25s; }
+  .hpbar.enemy { background: linear-gradient(90deg,#ff3d3d,#ff9d3d); }
+
+  /* ---------- バトル画面 ---------- */
+  #battle-screen { flex: 1; }
+  #player-info { background: var(--panel); border-radius: 12px; padding: 10px; margin-bottom: 10px; }
+  #player-info .row { display: flex; justify-content: space-between; font-size: 12px; color: var(--sub); margin-bottom: 4px; }
+
+  #battle-field {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: linear-gradient(180deg, #2a1f42 0%, #1a1428 100%);
+    border-radius: 16px; padding: 20px; position: relative; min-height: 260px;
+  }
+  #enemy-name { font-size: 15px; color: var(--sub); margin-bottom: 6px; }
+  #enemy-emoji {
+    font-size: 84px; cursor: pointer; transition: transform .08s;
+    filter: drop-shadow(0 6px 10px rgba(0,0,0,0.5));
+  }
+  #enemy-emoji:active { transform: scale(0.85) rotate(-6deg); }
+  #enemy-hp-wrap { width: 80%; margin-top: 14px; }
+  #enemy-hp-label { font-size: 11px; color: var(--sub); text-align: center; margin-top: 3px; }
+
+  .dmg-popup {
+    position: absolute; font-weight: 900; font-size: 22px; color: var(--accent2);
+    pointer-events: none; animation: floatUp .7s ease-out forwards;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+  }
+  @keyframes floatUp {
+    0% { opacity: 1; transform: translateY(0) scale(0.8); }
+    100% { opacity: 0; transform: translateY(-60px) scale(1.3); }
+  }
+
+  #battle-log { font-size: 12px; color: var(--sub); text-align: center; min-height: 18px; margin-top: 10px; }
+
+  #bottom-nav { display: flex; gap: 8px; margin-top: 10px; }
+  .nav-btn {
+    flex: 1; padding: 12px; border: none; border-radius: 12px; background: var(--panel-light);
+    color: var(--text); font-size: 14px; font-weight: bold;
+  }
+  .nav-btn.primary { background: linear-gradient(90deg, var(--accent), #ff7a3d); }
+
+  /* ---------- レベルアップ演出 ---------- */
+  #levelup-overlay {
+    position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(10,5,20,0.85); z-index: 50; flex-direction: column; text-align: center;
+  }
+  #levelup-overlay.show { display: flex; }
+  #levelup-overlay .big { font-size: 30px; font-weight: 900; color: var(--accent2);
+    text-shadow: 0 0 20px rgba(255,203,61,0.8); animation: pop .5s ease; }
+  #levelup-overlay .detail { color: var(--sub); font-size: 13px; margin-top: 14px; line-height: 1.8; }
+  @keyframes pop { 0% { transform: scale(0.3); opacity: 0; } 60% { transform: scale(1.15); } 100% { transform: scale(1); opacity: 1; } }
+
+  /* ---------- ショップ画面 ---------- */
+  #shop-screen h2 { font-size: 16px; margin: 6px 0 10px; color: var(--accent2); }
+  .shop-section { margin-bottom: 18px; }
+  .shop-item {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--panel); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px;
+  }
+  .shop-item .name { font-size: 14px; font-weight: bold; }
+  .shop-item .desc { font-size: 11px; color: var(--sub); }
+  .shop-item button {
+    border: none; border-radius: 20px; padding: 8px 14px; font-size: 12px; font-weight: bold;
+    background: var(--panel-light); color: var(--text);
+  }
+  .shop-item button.buy-yani { background: linear-gradient(90deg,#ffd23d,#ff9d3d); color: #221a05; }
+  .shop-item button.buy-chike { background: linear-gradient(90deg,#3dd8ff,#3d8bff); color: #051a22; }
+  .shop-item button:disabled { opacity: 0.4; }
+  .shop-item.owned button { background: #2a2038; color: var(--sub); }
+  .shop-item.equipped { outline: 2px solid var(--accent2); }
+
+  #toast {
+    position: absolute; left: 50%; bottom: 90px; transform: translateX(-50%);
+    background: rgba(0,0,0,0.85); color: white; padding: 10px 18px; border-radius: 20px;
+    font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .3s; z-index: 60;
+  }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ===================== タイトル画面 ===================== -->
+  <div id="title-screen" class="screen active">
+    <div class="logo">令和黎明期</div>
+    <div class="subtitle">- REIWA REIMEIKI HACK &amp; SLASH -</div>
+    <button class="start-btn" id="start-btn">タップしてスタート</button>
+    <div class="flavor">対バンのライバルたちを蹴散らして<br>「ファンの数」を増やし、伝説のバンドを目指せ!</div>
+  </div>
+
+  <!-- ===================== バトル画面 ===================== -->
+  <div id="battle-screen" class="screen">
+    <div id="status-bar">
+      <div class="stat-chip fan">ファンの数 <b id="stat-fans">0</b></div>
+      <div class="stat-chip yani">ヤニ <b id="stat-yani">0</b></div>
+      <div class="stat-chip chike">ドリチケ <b id="stat-chike">0</b></div>
+    </div>
+
+    <div id="player-info">
+      <div class="row"><span>令和黎明期(Lv.<span id="stat-level">1</span>)</span><span>HP <span id="player-hp-text">0/0</span></span></div>
+      <div class="hpbar-wrap"><div class="hpbar" id="player-hpbar" style="width:100%"></div></div>
+      <div class="row" style="margin-top:6px;"><span>攻撃力 <span id="stat-atk">0</span></span><span>装備: <span id="stat-weapon">-</span></span></div>
+    </div>
+
+    <div id="battle-field">
+      <div id="enemy-name">-</div>
+      <div id="enemy-emoji">👾</div>
+      <div id="enemy-hp-wrap">
+        <div class="hpbar-wrap"><div class="hpbar enemy" id="enemy-hpbar" style="width:100%"></div></div>
+        <div id="enemy-hp-label">0 / 0</div>
+      </div>
+    </div>
+    <div id="battle-log">敵をタップして攻撃しよう!</div>
+
+    <div id="bottom-nav">
+      <button class="nav-btn" id="open-shop-btn">🛒 ショップ</button>
+      <button class="nav-btn primary" id="save-btn">💾 セーブ</button>
+    </div>
+  </div>
+
+  <!-- ===================== ショップ画面 ===================== -->
+  <div id="shop-screen" class="screen">
+    <div id="status-bar">
+      <div class="stat-chip yani">ヤニ <b id="shop-stat-yani">0</b></div>
+      <div class="stat-chip chike">ドリチケ <b id="shop-stat-chike">0</b></div>
+    </div>
+    <h2>⚔️ 武器屋(ヤニで購入)</h2>
+    <div class="shop-section" id="weapon-list"></div>
+    <h2>💎 限定装備(ドリチケで購入)</h2>
+    <div class="shop-section" id="premium-list"></div>
+    <button class="nav-btn primary" id="back-to-battle-btn">戦闘に戻る</button>
+  </div>
+
+  <!-- レベルアップ演出オーバーレイ -->
+  <div id="levelup-overlay">
+    <div class="big">LEVEL UP!</div>
+    <div class="detail" id="levelup-detail"></div>
+  </div>
+
+  <div id="toast"></div>
+</div>
+
+<script>
+/* =========================================================================
+ * 令和黎明期ハクスラ ゲームロジック
+ * -------------------------------------------------------------------------
+ * このゲームの3つの独自要素:
+ *   ヤニ         … 通常通貨。敵を倒すと入手し、武器屋の武器購入に使う。
+ *   ドリチケ     … 課金通貨(ダミー実装)。限定装備の購入に使う。
+ *   ファンの数   … 強さステータス(レベル相当)。敵を倒すと増加し、
+ *                   一定値に達するとレベルアップして攻撃力/HPが上がる。
+ * ========================================================================= */
+
+const SAVE_KEY = "reiwa_reimeiki_save_v1";
+
+/* ---- 武器マスタ(ヤニで購入する通常装備) ---- */
+const WEAPON_MASTER = [
+  { id: "wpn_stick",   name: "ドラムスティック", desc: "駆け出しの一本。ATK+2",      price: 0,    atk: 2  },
+  { id: "wpn_pick",    name: "エレキピック",     desc: "鋭い一撃。ATK+5",             price: 50,   atk: 5  },
+  { id: "wpn_mic",     name: "伝説のマイクスタンド", desc: "シャウトで薙ぎ払う。ATK+12", price: 200,  atk: 12 },
+  { id: "wpn_amp",     name: "特製アンプヘッド", desc: "轟音の一撃。ATK+25",          price: 600,  atk: 25 },
+  { id: "wpn_axe",     name: "デスボイスアクスギター", desc: "対バン最強格。ATK+45",  price: 1500, atk: 45 },
+];
+
+/* ---- 限定装備マスタ(ドリチケで購入するレア装備) ---- */
+const PREMIUM_MASTER = [
+  { id: "prm_jacket", name: "限定バンドTシャツ", desc: "ファンの証。ATK+15 / HP+30", price: 5,  atk: 15, hp: 30 },
+  { id: "prm_guitar",  name: "サイン入りギター", desc: "伝説の一本。ATK+40 / HP+60", price: 15, atk: 40, hp: 60 },
+  { id: "prm_crown",   name: "黎明期の王冠",     desc: "最強の証。ATK+80 / HP+120",  price: 30, atk: 80, hp: 120 },
+];
+
+/* ---- 敵マスタ(タップして倒す対象) ---- */
+const ENEMY_MASTER = [
+  { name: "自称天才サブスクバンド", emoji: "🎸", hp: 20,  yani: 8,  fans: 3 },
+  { name: "モンスター化した常連客", emoji: "👹", hp: 30,  yani: 12, fans: 4 },
+  { name: "ライバル対バン Vo.",     emoji: "🤘", hp: 45,  yani: 18, fans: 6 },
+  { name: "厄介系ファン(暴走)",   emoji: "😤", hp: 60,  yani: 24, fans: 8 },
+  { name: "伝説のライブハウス支配人", emoji: "🕴️", hp: 90, yani: 40, fans: 14 },
+];
+
+/* ---- プレイヤー状態(デフォルト) ---- */
+function defaultPlayer() {
+  return {
+    fans: 0,              // ★ファンの数(強さステータス)
+    level: 1,
+    yani: 0,               // ★ヤニ(通常通貨)
+    drichike: 20,           // ★ドリチケ(課金通貨・初期ダミー所持数)
+    baseAtk: 8,
+    baseHp: 60,
+    hp: 60,
+    ownedWeapons: ["wpn_stick"],
+    ownedPremium: [],
+    equippedWeapon: "wpn_stick",
+    equippedPremium: [],
+    enemyIndex: 0,
+  };
+}
+
+let player = loadGame() || defaultPlayer();
+let enemy = null;
+
+/* ---- 画面遷移 ---- */
+function showScreen(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+}
+
+document.getElementById("start-btn").addEventListener("click", () => {
+  showScreen("battle-screen");
+  spawnEnemy();
+  renderPlayer();
+});
+document.getElementById("open-shop-btn").addEventListener("click", () => {
+  renderShop();
+  showScreen("shop-screen");
+});
+document.getElementById("back-to-battle-btn").addEventListener("click", () => {
+  showScreen("battle-screen");
+  renderPlayer();
+});
+document.getElementById("save-btn").addEventListener("click", () => {
+  saveGame();
+  showToast("セーブしました!");
+});
+
+/* =========================================================================
+ * ステータス計算(装備+ファンの数から実際のATK/HPを算出)
+ * ========================================================================= */
+function getWeapon(id) { return WEAPON_MASTER.find(w => w.id === id); }
+function getPremium(id) { return PREMIUM_MASTER.find(p => p.id === id); }
+
+function currentAtk() {
+  let atk = player.baseAtk;
+  const w = getWeapon(player.equippedWeapon);
+  if (w) atk += w.atk;
+  player.equippedPremium.forEach(id => {
+    const p = getPremium(id);
+    if (p) atk += p.atk;
+  });
+  // ★ファンの数による補正(ファンが多いほど攻撃力アップ)
+  atk += Math.floor(player.fans * 0.5);
+  return atk;
+}
+
+function currentMaxHp() {
+  let hp = player.baseHp;
+  player.equippedPremium.forEach(id => {
+    const p = getPremium(id);
+    if (p) hp += p.hp;
+  });
+  // ★ファンの数による補正(ファンが多いほどHPアップ)
+  hp += player.fans * 2;
+  return hp;
+}
+
+/* レベルアップに必要な累計ファンの数 */
+function fansNeededForLevel(level) {
+  return level * 20;
+}
+
+/* =========================================================================
+ * 敵の生成・戦闘処理
+ * ========================================================================= */
+function spawnEnemy() {
+  const idx = Math.floor(Math.random() * ENEMY_MASTER.length);
+  const base = ENEMY_MASTER[idx];
+  // レベルが上がるほど敵も強くスケーリング
+  const scale = 1 + (player.level - 1) * 0.35;
+  enemy = {
+    name: base.name,
+    emoji: base.emoji,
+    hp: Math.round(base.hp * scale),
+    maxHp: Math.round(base.hp * scale),
+    yaniReward: Math.round(base.yani * scale),
+    fanReward: Math.round(base.fans * scale),
+  };
+  document.getElementById("enemy-name").textContent = enemy.name;
+  document.getElementById("enemy-emoji").textContent = enemy.emoji;
+  document.getElementById("battle-log").textContent = "敵をタップして攻撃しよう!";
+  renderEnemy();
+}
+
+document.getElementById("enemy-emoji").addEventListener("click", (e) => {
+  attackEnemy(e);
+});
+
+function attackEnemy(e) {
+  if (!enemy) return;
+  const dmg = currentAtk();
+  enemy.hp = Math.max(0, enemy.hp - dmg);
+  showDamagePopup(dmg, e);
+  renderEnemy();
+
+  if (enemy.hp <= 0) {
+    defeatEnemy();
+  }
+}
+
+function showDamagePopup(dmg, e) {
+  const field = document.getElementById("battle-field");
+  const popup = document.createElement("div");
+  popup.className = "dmg-popup";
+  popup.textContent = "-" + dmg;
+  const rect = field.getBoundingClientRect();
+  const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+  const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+  popup.style.left = (x - 10) + "px";
+  popup.style.top = (y - 10) + "px";
+  field.appendChild(popup);
+  setTimeout(() => popup.remove(), 700);
+}
+
+/* 敵を倒した時の処理: ★ヤニ獲得 + ★ファンの数増加 */
+function defeatEnemy() {
+  player.yani += enemy.yaniReward;       // ★ヤニ獲得
+  const gainedFans = enemy.fanReward;    // ★ファンの数増加
+  player.fans += gainedFans;
+
+  document.getElementById("battle-log").textContent =
+    `${enemy.name}を倒した! ヤニ+${enemy.yaniReward} ファン+${gainedFans}`;
+
+  checkLevelUp();
+  renderPlayer();
+  setTimeout(spawnEnemy, 500);
+}
+
+/* ★ファンの数が閾値に達したらレベルアップ演出とステータス上昇 */
+function checkLevelUp() {
+  let leveledUp = false;
+  let need = fansNeededForLevel(player.level);
+  while (player.fans >= need) {
+    player.level += 1;
+    leveledUp = true;
+    need = fansNeededForLevel(player.level);
+  }
+  if (leveledUp) {
+    player.hp = currentMaxHp(); // レベルアップで全回復
+    document.getElementById("levelup-detail").textContent =
+      `Lv.${player.level} になった!\n攻撃力: ${currentAtk()} / HP: ${currentMaxHp()}`;
+    const ov = document.getElementById("levelup-overlay");
+    ov.classList.add("show");
+    setTimeout(() => ov.classList.remove("show"), 1400);
+  }
+}
+
+/* =========================================================================
+ * 描画
+ * ========================================================================= */
+function renderPlayer() {
+  document.getElementById("stat-fans").textContent = player.fans;     // ★ファンの数 表示
+  document.getElementById("stat-yani").textContent = player.yani;     // ★ヤニ 表示
+  document.getElementById("stat-chike").textContent = player.drichike; // ★ドリチケ 表示
+  document.getElementById("stat-level").textContent = player.level;
+  document.getElementById("stat-atk").textContent = currentAtk();
+
+  const maxHp = currentMaxHp();
+  if (player.hp > maxHp) player.hp = maxHp;
+  document.getElementById("player-hp-text").textContent = `${player.hp}/${maxHp}`;
+  document.getElementById("player-hpbar").style.width = (player.hp / maxHp * 100) + "%";
+
+  const w = getWeapon(player.equippedWeapon);
+  document.getElementById("stat-weapon").textContent = w ? w.name : "-";
+}
+
+function renderEnemy() {
+  document.getElementById("enemy-hpbar").style.width = (enemy.hp / enemy.maxHp * 100) + "%";
+  document.getElementById("enemy-hp-label").textContent = `${enemy.hp} / ${enemy.maxHp}`;
+}
+
+function renderShop() {
+  document.getElementById("shop-stat-yani").textContent = player.yani;
+  document.getElementById("shop-stat-chike").textContent = player.drichike;
+
+  const weaponList = document.getElementById("weapon-list");
+  weaponList.innerHTML = "";
+  WEAPON_MASTER.forEach(w => {
+    const owned = player.ownedWeapons.includes(w.id);
+    const equipped = player.equippedWeapon === w.id;
+    const row = document.createElement("div");
+    row.className = "shop-item" + (owned ? " owned" : "") + (equipped ? " equipped" : "");
+    row.innerHTML = `
+      <div>
+        <div class="name">${w.name}${equipped ? " (装備中)" : ""}</div>
+        <div class="desc">${w.desc}</div>
+      </div>
+    `;
+    const btn = document.createElement("button");
+    if (owned) {
+      btn.textContent = equipped ? "装備中" : "装備する";
+      btn.disabled = equipped;
+      btn.onclick = () => { player.equippedWeapon = w.id; renderShop(); renderPlayer(); showToast(`${w.name}を装備した`); };
+    } else {
+      btn.className = "buy-yani";
+      btn.textContent = `${w.price} ヤニ`;
+      btn.disabled = player.yani < w.price;
+      btn.onclick = () => buyWeapon(w);
+    }
+    row.appendChild(btn);
+    weaponList.appendChild(row);
+  });
+
+  const premiumList = document.getElementById("premium-list");
+  premiumList.innerHTML = "";
+  PREMIUM_MASTER.forEach(p => {
+    const owned = player.ownedPremium.includes(p.id);
+    const equipped = player.equippedPremium.includes(p.id);
+    const row = document.createElement("div");
+    row.className = "shop-item" + (owned ? " owned" : "") + (equipped ? " equipped" : "");
+    row.innerHTML = `
+      <div>
+        <div class="name">${p.name}${equipped ? " (装備中)" : ""}</div>
+        <div class="desc">${p.desc}</div>
+      </div>
+    `;
+    const btn = document.createElement("button");
+    if (owned) {
+      btn.textContent = equipped ? "装備中" : "装備する";
+      btn.disabled = equipped;
+      btn.onclick = () => { player.equippedPremium.push(p.id); renderShop(); renderPlayer(); showToast(`${p.name}を装備した`); };
+    } else {
+      btn.className = "buy-chike";
+      btn.textContent = `${p.price} ドリチケ`;
+      btn.disabled = player.drichike < p.price;
+      btn.onclick = () => buyPremium(p);
+    }
+    row.appendChild(btn);
+    premiumList.appendChild(row);
+  });
+}
+
+/* ★ヤニを消費して武器を購入 */
+function buyWeapon(w) {
+  if (player.yani < w.price) return;
+  player.yani -= w.price;
+  player.ownedWeapons.push(w.id);
+  player.equippedWeapon = w.id;
+  renderShop();
+  renderPlayer();
+  showToast(`${w.name}を購入した!`);
+}
+
+/* ★ドリチケを消費して限定装備を購入 */
+function buyPremium(p) {
+  if (player.drichike < p.price) return;
+  player.drichike -= p.price;
+  player.ownedPremium.push(p.id);
+  player.equippedPremium.push(p.id);
+  renderShop();
+  renderPlayer();
+  showToast(`${p.name}を手に入れた!`);
+}
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 1600);
+}
+
+/* =========================================================================
+ * セーブ / ロード(localStorage)
+ * ========================================================================= */
+function saveGame() {
+  localStorage.setItem(SAVE_KEY, JSON.stringify(player));
+}
+function loadGame() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    return Object.assign(defaultPlayer(), data);
+  } catch (e) {
+    return null;
+  }
+}
+
+/* 初期HPを最大値に合わせる(ロード直後のズレ防止) */
+player.hp = Math.min(player.hp || currentMaxHp(), currentMaxHp());
+if (!player.hp) player.hp = currentMaxHp();
+
+/* タイトルに戻らずゲームを再開したい場合に備え、ロードデータがあれば
+   タイトルはそのまま表示し、スタートボタンでバトル画面へ進む */
+</script>
+</body>
+</html>
